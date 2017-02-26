@@ -21,4 +21,4 @@ max_weight = max(d$weight)
 
 # write dataframe to file
 df = data.frame(set=i_f, weight = max_weight, height = max_height)
-write.table(df, file = 'r.csv', sep = ',', row.names= F)
+write.table(df, file = 'result.csv', sep = ',', row.names= F)
