@@ -1,11 +1,12 @@
 #!/usr/bin/env Rscript
 ########################
 # homework1 104971001
+# find max weight and height in the file
 ########################
 
 # -files [input file] -out [output file], exchangable
-# find max weight and height in the file
 args = commandArgs(trailingOnly=TRUE)
+
 # default output file: result.csv
 o_f = 'result.csv' 
 
@@ -36,7 +37,7 @@ d <- read.csv(i_f)
 # find max height and weight
 max_height = round(max(d$height), 2)
 max_weight = round(max(d$weight), 2)
-# 
-# # write dataframe to file
+
+# write dataframe to file
 df = data.frame(set=i_f, weight = max_weight, height = max_height)
 write.table(df, file = o_f, sep = ',', row.names= F)
