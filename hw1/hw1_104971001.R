@@ -16,8 +16,9 @@ if (length(args)==0) {
 } else if (length(args)==2 && args[1] == '-files') {
   i_f <- args[2]
 } else if (length(args)==4){
-  if (args[1] == '-files'){
+  if (args[1] == '-files' && args[3] == '-out'){
     i_f <- args[2]
+    o_f <- args[4]
   }else if (args[1] == '-out' && args[3] == '-files'){
     o_f <- args[2]
     i_f <- args[4]
