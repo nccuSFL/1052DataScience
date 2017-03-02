@@ -1,1 +1,1 @@
-105-2 NCCU Data Science
+# 105-2 NCCU Data Science class
