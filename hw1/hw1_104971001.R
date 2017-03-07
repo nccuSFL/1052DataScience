@@ -29,15 +29,18 @@ if (length(args)==0) {
 }
 
 cat('your input file is: ',i_f)
-cat('\nyout output file is:', o_f, '\n')
+cat('\nyour output file is:', o_f, '\n')
 
 d <- read.csv(i_f)
 # head(d)
+# dim(d)
 
 # find max height and weight
 max_height = round(max(d$height), 2)
 max_weight = round(max(d$weight), 2)
 
+setname <- sub('\\.csv$', '', i_f)
+
 # write dataframe to file
-df = data.frame(set=i_f, weight = max_weight, height = max_height)
-write.table(df, file = o_f, sep = ',', row.names= F)
+df = data.frame(set=setname, weight = max_weight, height = max_height)
+write.table(df, file = o_f, sep = ',', row.names= FALSE, quote=FALSE)
