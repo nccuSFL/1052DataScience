@@ -19,14 +19,23 @@ pkgTest <- function(x)
   }
 }
 
-getAUC <- function(refer, scores)
-{
-  rocObj <- roc(refer, scores) 
-  result = auc(rocObj)
-  return(result)
-}
+pkgTest("ROCR")
 
-pkgTest("pROC")
+getAUC <- function(scores, refs)
+{
+  return(attributes(performance(prediction(scores, refs), "auc"))$y.values[[1]])
+}
+# getAUC <- function(refer, scores)
+# {
+#   print(refer)
+#   print(scores)
+#   rocObj <- roc(refer, scores, direction = "<")
+#   print(rocObj)
+#   result = auc(rocObj)
+#   return(result)
+# }
+
+
 
 
 # read parameters
@@ -102,10 +111,12 @@ for(file in files)
   f1 = round(((2*tp)/(2*tp + fp + fn)), 2)
   
   if(target == 'male'){
-    auc <- round(getAUC(d$reference, d$pred.score), 2)
+    auc <- round(getAUC(d$pred.score, d$reference), 2)
+    # auc <- round(getAUC(ifelse(d[,"reference"] == "male",1,0), d$pred.score), 2)
     # print(auc)
   }else{
-    auc <- round(getAUC(d$reference, 1-d$pred.score), 2)
+    auc <- round(getAUC(1-d$pred.score, d$reference), 2)
+    # auc <- round(getAUC(ifelse(d[,"reference"] == "female",1,0), 1 - d$pred.score), 2)
     # print(auc)
   }
   
