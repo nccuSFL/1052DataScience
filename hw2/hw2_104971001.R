@@ -111,11 +111,11 @@ for(file in files)
   f1 = round(((2*tp)/(2*tp + fp + fn)), 2)
   
   if(target == 'male'){
-    auc <- round(getAUC(d$pred.score, d$reference), 2)
+    auc <- round(getAUC(d$pred.score, ifelse(d[,"reference"] == "male",1,0)), 2)
     # auc <- round(getAUC(ifelse(d[,"reference"] == "male",1,0), d$pred.score), 2)
     # print(auc)
   }else{
-    auc <- round(getAUC(1-d$pred.score, d$reference), 2)
+    auc <- round(getAUC(1-d$pred.score, ifelse(d[,"reference"] == "female",1,0)), 2)
     # auc <- round(getAUC(ifelse(d[,"reference"] == "female",1,0), 1 - d$pred.score), 2)
     # print(auc)
   }
