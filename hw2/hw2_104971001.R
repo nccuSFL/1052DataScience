@@ -19,19 +19,15 @@ pkgTest <- function(x)
   }
 }
 
+getAUC <- function(refer, scores)
+{
+  rocObj <- roc(refer, scores) 
+  result = auc(rocObj)
+  return(result)
+}
+
 pkgTest("pROC")
 
-# query_func<-function(query_m, i)
-# {
-#   if(query_m == "male"){
-#     which.min(i)
-#   }
-#   else if (query_m == "female") {
-#     which.max(i)
-#   } else {
-#     stop(paste("ERROR: unknown target", query_m))
-#   }
-# }
 
 # read parameters
 args = commandArgs(trailingOnly=TRUE)
@@ -59,10 +55,16 @@ while(i < length(args))
   i<-i+1
 }
 
-print("PROCESS")
 print(paste("target:", target))
 print(paste("output file:", out_f))
 print(paste("files:", files))
+
+# initial vector
+fname <- c()
+sens <- c()
+spes <- c()
+f1s <- c()
+aucs <- c()
 
 # read files, calculate TP, TN, FP, FN
 for(file in files)
@@ -72,8 +74,8 @@ for(file in files)
   fp = 0
   fn = 0
   name<-gsub(".csv", "", basename(file))
+  fname <- c(fname, name)
   d<-read.table(file, header=T,sep=",")
-  print(name)
   for(i in 1:dim(d)[1])
   {
     if(target == d[i,2]){
@@ -95,35 +97,34 @@ for(file in files)
   # print(fp)
   # print(tn)
   # print(fn)
-  sensitivity = tp / (tp+fn)
-  specificity = tn / (tn+fp)
-  f1 = (2*tp) / (2*tp + fp + fn)
-  refer <- c('a','a','b') 
-  prediction <- c('a','b','b')
-  rocObj <- roc(category, prediction) 
-  r = auc(rocObj)
-  print(r)
+  sensitivity = round(tp/(tp+fn), 2)
+  specificity = round(tn/(tn+fp), 2)
+  f1 = round(((2*tp)/(2*tp + fp + fn)), 2)
+  
+  if(target == 'male'){
+    auc <- round(getAUC(d$reference, d$pred.score), 2)
+    # print(auc)
+  }else{
+    auc <- round(getAUC(d$reference, 1-d$pred.score), 2)
+    # print(auc)
+  }
+  
+  sens <- c(sens, sensitivity)
+  spes <- c(spes, specificity)
+  f1s <- c(f1s, f1)
+  aucs <- c(aucs, auc)
 }
 
+# create dataframe, find max item, and write to file
+df <- data.frame(method=fname, sensitivity=sens, specificity=spes, F1=f1s, 
+                 AUC=aucs, stringsAsFactors=FALSE)
+index <- sapply(df[,c("sensitivity","specificity","F1","AUC")], which.max)
+df <- rbind(df, c("highest", fname[index]))
+print(df)
+write.table(df, file=out_f, row.names=F, quote=F, sep=",")
 
-# read files
-# names<-c()
-# weis<-c()
-# heis<-c()
-# for(file in files)
-# {
-#   name<-gsub(".csv", "", basename(file))
-#   d<-read.table(file, header=T,sep=",")
-#   weis<-c(weis, d$weight[query_func(query_m, d$weight)])
-#   heis<-c(heis, d$height[query_func(query_m, d$height)])
-#   names<-c(names,name)
-# }
-# out_data<-data.frame(set=names, wei=weis, hei=heis, stringsAsFactors = F)
-# index<-sapply(out_data[,c("wei","hei")], query_func, query_m=query_m)
-# 
-# # output file
-# out_data<-rbind(out_data,c(query_m,names[index]))
-# write.table(out_data, file=out_f, row.names = F, quote = F)
+
+
 
 
 
