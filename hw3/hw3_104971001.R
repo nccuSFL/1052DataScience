@@ -38,7 +38,7 @@ getAUC <- function(scores, refs)
 # read parameters
 args = commandArgs(trailingOnly=TRUE)
 if (length(args)==0) {
-  stop("USAGE: Rscript hw2_yourID.R --target male/female --files meth1 meth2 … methx --out result.csv", call.=FALSE)
+  stop("USAGE: Rscript hw3_yourID.R --target male/female --files meth1 meth2 … methx --out result.csv", call.=FALSE)
 }
 
 # parse parameters
@@ -119,11 +119,32 @@ for(file in files)
   aucs <- c(aucs, auc)
 }
 
+
 # create dataframe, find max item, and write to file
 df <- data.frame(method=fname, sensitivity=sens, specificity=spes, F1=f1s, 
                  AUC=aucs, stringsAsFactors=FALSE)
+
+# find the 2nd highest for F1
+n <- length(files)
+index1 <- order(df$F1, decreasing = T)[1]
+index2 <- order(df$F1, decreasing = T)[2]
+print(index2)
+
+# build contingency matrix
+data1 <- read.csv(files[index1], header=T, sep=",")
+data2 <- read.csv(files[index2], header=T, sep=",")
+contable <- table(data1$prediction, data2$prediction)
+print("contingency table:")
+print(contable)
+
+# test for significance
+pvalue <- fisher.test(contable)$p.value
+
 index <- sapply(df[,c("sensitivity","specificity","F1","AUC")], which.max)
 df <- rbind(df, c("highest", fname[index]))
+if(pvalue < 0.05){
+  df[length(files)+1,"F1"] <- paste(df[length(files)+1,"F1"], "*", sep="")
+}
 print(df)
 write.table(df, file=out_f, row.names=F, quote=F, sep=",")
 
