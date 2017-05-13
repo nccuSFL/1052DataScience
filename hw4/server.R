@@ -26,8 +26,8 @@ function(input, output) {
       tn = 0
       fp = 0
       fn = 0
-      name<-gsub(".csv", "", basename(file))
-      fname <- c(fname, name)
+      # name<-gsub(".csv", "", basename(file))
+      # fname <- c(fname, name)
       d<-read.table(file.path(getwd(),'methods',file), header=T,sep=",")
       for(i in 1:dim(d)[1])
       {
