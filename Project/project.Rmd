@@ -1,0 +1,45 @@
+---
+title: "Data Science R Notebook"
+output: html_notebook
+---
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Cmd+Shift+Enter*. 
+
+```{r}
+library(ggplot2)
+```
+
+```{r}
+d<-read.table('./data/smaller_100.csv', header=T,sep=",")
+# d<-read.csv('./data/s.csv', header=T,sep=",")
+summary(d)
+# typeof(d)
+```
+```{r}
+table(d$click_bool)
+round(prop.table(table(d$click_bool)),4)
+```
+
+
+
+```{r}
+# show numbers of non-booking and booking
+table(d$booking_bool)
+total_rows <- nrow(d)
+num_positive <- table(d$booking_bool)[2]
+print(paste("Ratio of booking of all search results:", round(num_positive/total_rows*100,2),"%"))
+```
+
+```{r}
+# show relation between position and booking
+# table(d$position,d$booking_bool)
+summary(d$position)
+table(d$booking_bool,d$position)
+print(qplot(position, data=bookingData, geom="histogram", binwidth=1, main = "# of Bookings vs Position "))
+# note that at position 5, 11 ,..there are fewer data.
+```
+
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Cmd+Option+I*.
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Cmd+Shift+K* to preview the HTML file).
