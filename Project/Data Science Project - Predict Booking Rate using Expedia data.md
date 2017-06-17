@@ -1,4 +1,4 @@
-## Project - Predict Booking Rate using Expedia data(ICDM 2013)
+## Project - Predict Booking using Expedia data(ICDM 2013)
 
 ### Project and Data Description
 
@@ -60,11 +60,14 @@
 ### Evaluation
 
 * Cross Validation
-* AUC
+* ROC
+* **AUC**
 
 ### Data processing
 
 1. Missing value
+   * hotel descriptions:***prop_review_score***, ***prop_location_score2***, ***srch_query_affinity_score***
+     * use worse case
 2. Categorical value to numeric value
 
 
@@ -73,10 +76,13 @@
 
 ### Using classification model and result
 
-1. Random Forest
-2. Gradient Boost
-3. SVM
-4. Naive bayesian classifier
+1. Null model
+   * fill with all 0(or all 1): AUC = 0.5	
+2. Random Forest
+3. Gradient Boost
+4. SVM
+5. Naive bayesian classifier
+6. Perfomance: Precision, recall, R-square
 
 ### Conclusion
 
@@ -84,9 +90,15 @@
 
 REF:
 
-https://github.com/shawnhero/ICDM2013-Expedia-Recommendation-System/tree/master/RScripts
+* ICDM 2013: https://github.com/shawnhero/ICDM2013-Expedia-Recommendation-System/tree/master/RScripts
 
 
+* random forest: http://dni-institute.in/blogs/random-forest-using-r-step-by-step-tutorial/
+
+
+* use caret to do cv: http://machinelearningmastery.com/how-to-estimate-model-accuracy-in-r-using-the-caret-package/
+
+PDFs
 
 
 

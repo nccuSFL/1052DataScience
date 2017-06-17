@@ -1,42 +1,176 @@
 ---
-title: "Data Science R Notebook"
+title: "Data Science final project R Notebook"
 output: html_notebook
 ---
 
 Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Cmd+Shift+Enter*. 
 
 ```{r}
+# initialization
 library(ggplot2)
+
+pkgTest <- function(x)
+{
+  if (!require(x,character.only = TRUE))
+  {
+    install.packages(x,dep=TRUE)
+    if(!require(x,character.only = TRUE)) stop("Package not found")
+  }
+}
+
+pkgTest("ROCR")
+
+getAUC <- function(preds, obs)
+{
+  return(attributes(performance(prediction(preds, obs), "auc"))$y.values[[1]])
+}
 ```
 
 ```{r}
-d<-read.table('./data/smaller_100.csv', header=T,sep=",")
-# d<-read.csv('./data/s.csv', header=T,sep=",")
+# load data
+# d<-read.csv('./data/smaller_100.csv', header=T,sep=",")
+d<-read.csv('./data/s.csv', header=T,sep=",", na.strings = "NULL")
 summary(d)
+print(nrow(d))
+varNames <- names(d)
+# summary(d)
 # typeof(d)
 ```
-```{r}
-table(d$click_bool)
-round(prop.table(table(d$click_bool)),4)
-```
 
+```{r}
+# split data into train and test
+smp_size <- floor(0.75 * nrow(d))
+set.seed(5566)
+train_ind <- sample(seq_len(nrow(d)), size = smp_size)
+
+d_train <- d[train_ind, ]
+d_test <- d[-train_ind, ]
+nrow(d_train)
+```
 
 
 ```{r}
 # show numbers of non-booking and booking
+# round(prop.table(table(d$click_bool)),4)
 table(d$booking_bool)
 total_rows <- nrow(d)
-num_positive <- table(d$booking_bool)[2]
-print(paste("Ratio of booking of all search results:", round(num_positive/total_rows*100,2),"%"))
+num_positive <- table(d$click_bool)[2]
+print(paste("Ratio of click of all search results:", round(num_positive/total_rows*100,2),"%"))
 ```
+
 
 ```{r}
 # show relation between position and booking
-# table(d$position,d$booking_bool)
+clickData<-d[which(d$click_bool==1),]
 summary(d$position)
-table(d$booking_bool,d$position)
-print(qplot(position, data=bookingData, geom="histogram", binwidth=1, main = "# of Bookings vs Position "))
+table(d$click_bool,d$position)
+print(qplot(position, data=clickData, geom="histogram", binwidth=1, main = "# of clicking vs Position "))
 # note that at position 5, 11 ,..there are fewer data.
+```
+
+```{r}
+# visualize missing value
+missing <- data.frame(matrix(NA, nrow=54, ncol=2))
+for(i in 1:dim(d)[2]){
+	# calcaulate the missing number
+	missing[i,2] <- sum(is.na(d[,i]))/nrow(d)
+}
+missing[,1] <- colnames(d)
+names(missing) <- c('names','percentage')
+ggplot(missing, aes(x=reorder(names, percentage), y=percentage)) +geom_bar(stat='identity') + theme(axis.text.x = element_text(angle = 90, hjust = 1)) + ylab("Missing Value Percentage")
+
+```
+
+
+```{r}
+# data preprosessing: deal with missing value
+# fill worst case of hotel missing value, review, location_score
+d$prop_review_score[is.na(d$prop_review_score)] <- 0
+d$prop_location_score2[is.na(d$prop_location_score2)] <- 0
+min_srch_score <- range(d$srch_query_affinity_score, na.rm=T)[1]
+d$srch_query_affinity_score[is.na(d$srch_query_affinity_score)] <- min_srch_score
+
+## competitor information
+for(i in seq(28,51, by=1)){
+	d[is.na(d[,i]), i] <- 0
+}
+
+# drop columns
+d$gross_bookings_usd <- NULL
+d$date_time <- NULL
+
+# for NAs of users' historical data,
+# we replace them by the mean value of the column
+avg_v_usd <- mean(d$visitor_hist_adr_usd, na.rm=T)
+avg_v_star <- mean(d$visitor_hist_starrating, na.rm=T)
+d$visitor_hist_adr_usd[is.na(d$visitor_hist_adr_usd)] <- avg_v_usd
+d$visitor_hist_starrating[is.na(d$visitor_hist_starrating)] <- avg_v_star
+avg_dis <- mean(d$orig_destination_distance, na.rm=T)
+d$orig_destination_distance[is.na(d$orig_destination_distance)] <- avg_dis
+
+# check any NA left or not: should be 0.
+print(sum(is.na(d)))
+```
+
+```{r}
+# calculate AUC and draw ROC of null model: all prediction = 0, AUC = 0.5
+pred.0 <- rep(0,nrow(d))
+getAUC(pred.0, d$click_bool)
+pred1 <- prediction(pred.0, d$click_bool)
+perf1 <- performance(pred1, "tpr", "fpr")
+plot(perf1)
+```
+
+```{r}
+# apply random forest
+pkgTest("randomForest")
+set.seed(119)
+# original:integer, need to be factor for classification
+# d$booking_bool <- factor(d$booking_bool)
+d$click_bool <- factor(d$click_bool)
+
+# choose features, and make right format for randomForest function
+# varNames1 <- c("position", "prop_review_score")
+varNames1 <- varNames[!varNames %in% c("click_bool","date_time", "gross_bookings_usd", "booking_bool")]
+summary(varNames1)
+make_name <- c(varNames1, "click_bool")
+for (f in make_name) {
+  if (class(d[[f]])=="factor") {
+    levels <- unique(c(d[[f]]))
+    d[[f]] <- factor(d[[f]],
+                    labels=make.names(levels))
+  }
+}
+varNames1 <- paste(varNames1, collapse = "+")
+rf.form <- as.formula(paste("click_bool", varNames1, sep = " ~ "))
+print(rf.form)
+rf.fit <- randomForest(rf.form, d, importance=T, ntree=50, na.action = na.exclude)
+plot(rf.fit)
+varImpPlot(rf.fit, sort = T)
+```
+
+```{r}
+pkgTest("caret")
+train_contrl <- trainControl(method = "cv", number = 5, summaryFunction=twoClassSummary, classProbs=T)
+model <- train(rf.form, data = d, method="rf", trControl=train_contrl, metric="ROC")
+print(model)
+
+```
+```{r}
+# Prediction
+result.predicted.prob <- predict(model, newdata = d_test, type="prob") 
+getAUC(result.predicted.prob$X2, d_test$click_bool)
+
+# Draw ROC curve.
+class(d_test$click_bool)
+class(result.predicted.prob)
+result.roc <- roc(d_test$click_bool, result.predicted.prob$X2)
+plot(result.roc)
+# plot(result.roc, print.thres="best", print.thres.best.method="closest.topleft")
+# 
+# result.coords <- coords(result.roc, "best", best.method="closest.topleft", ret=c("threshold", "accuracy"))
+# print(result.coords)#to get threshold and accuracy
+
 ```
 
 
