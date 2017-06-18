@@ -8,6 +8,7 @@
 
    2. Challenges
       * Data size
+        * downsampling
       * Complex data
       * Missing value
       * Mixure of random/non-random
@@ -59,9 +60,8 @@
 
 ### Evaluation
 
-* Cross Validation
-* ROC
-* **AUC**
+* Split data to **Train**(75%), **Cross Validation(5 fold)** and **Test**(25%) data set
+* ROC, ***AUC***
 
 ### Data processing
 
@@ -76,6 +76,8 @@
        * No significan difference
 
 2. Features normalization
+
+   * log Price features: ***price_usd***, ***visitor_hist_adr_usd***
 
 3. Down sampling negative instances
 
@@ -94,10 +96,11 @@
 1. Null model
    * fill with all 0(or all 1): AUC = 0.5	
 2. Random Forest
-3. Gradient Boost
-4. SVM
-5. Naive bayesian classifier
-6. Perfomance: Precision, recall, R-square
+3. Logistic Regression
+4. Gradient Boost
+5. SVM
+6. XGB: xgbtree
+7. Perfomance: Precision, recall, R-square
 
 ### Conclusion
 
@@ -113,8 +116,15 @@ REF:
 
 * use caret to do cv: http://machinelearningmastery.com/how-to-estimate-model-accuracy-in-r-using-the-caret-package/
 * http://amunategui.github.io/binary-outcome-modeling/
+* SVM:https://www.r-bloggers.com/the-5th-tribe-support-vector-machines-and-caret/
+* LR:https://www.r-bloggers.com/evaluating-logistic-regression-models/
+* https://www.analyticsvidhya.com/blog/2016/12/practical-guide-to-implement-machine-learning-with-caret-package-in-r-with-practice-problem/
+* deal with imbalance data: https://www.analyticsvidhya.com/blog/2016/03/practical-guide-deal-imbalanced-classification-problems/
 
 PDFs
 
 
 
+d -> data visualization
+
+ -> data_processing -> train, test -> downSampling

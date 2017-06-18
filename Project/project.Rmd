@@ -26,36 +26,34 @@ getAUC <- function(preds, obs)
 }
 pkgTest("caret")
 pkgTest("pROC")
+
+predTest_plot <- function(trained_model, model_name)
+{
+  print(trained_model)
+  tryCatch({
+    plot(trained_model)
+  }, error = function(e) {
+    conditionMessage(e)
+  })
+  result.predicted.prob <- predict(trained_model, d_test, type="prob") 
+  # print(head(result.predicted.prob))
+  result.roc <- roc(response = d_test$click_bool, predictor = result.predicted.prob$X2)
+  print(paste(model_name, " AUC: ",round(result.roc$auc,3)))
+  plot(result.roc, main=paste(model_name, " ROC plot"))
+  
+  confusionMatrix(data = predict(trained_model, d_test, type="raw"), 
+                  reference = d_test$click_bool, positive = "X2")
+}
 ```
 
 ```{r}
 # load data
-# d<-read.csv('./data/smaller_100.csv', header=T,sep=",")
-d<-read.csv('./data/s.csv', header=T,sep=",", na.strings = "NULL")
+# d<-read.csv('./data/smaller_100.csv', header=T,sep=",", na.strings = "NULL")
+d<-read.csv('./data/s.csv', header=T, sep=",", na.strings = "NULL")
 # summary(d)
 print(nrow(d))
 varNames <- names(d)
-# summary(d)
-# typeof(d)
 ```
-
-
-```{r}
-# show numbers of non-booking and booking
-# round(prop.table(table(d$click_bool)),4)
-table(d$click_bool)
-total_rows <- nrow(d)
-num_positive <- table(d$click_bool)[2]
-print(paste("Ratio of click of all search results:", round(num_positive/total_rows*100,2),"%"))
-
-# show relation between position and booking
-clickData<-d[which(d$click_bool==1),]
-summary(d$position)
-table(d$click_bool,d$position)
-print(qplot(position, data=clickData, geom="histogram", binwidth=1, main = "# of clicking vs Position "))
-# note that at position 5, 11 ,..there are fewer data.
-```
-
 ```{r}
 # visualize missing value
 missing <- data.frame(matrix(NA, nrow=54, ncol=2))
@@ -96,11 +94,15 @@ d$visitor_hist_starrating[is.na(d$visitor_hist_starrating)] <- avg_v_star
 avg_dis <- mean(d$orig_destination_distance, na.rm=T)
 d$orig_destination_distance[is.na(d$orig_destination_distance)] <- avg_dis
 
+# log price
+ggplot(d, aes(x=d$price_usd)) + geom_histogram(col = 'white') + theme_light()
+d$price_usd <- log(d$price_usd)
+d$visitor_hist_adr_usd <- log(d$visitor_hist_adr_usd)
+ggplot(d, aes(x=log(d$price_usd+1))) + geom_histogram(col = 'white') + theme_light()
+
 # check any NA left or not: should be 0.
 print(sum(is.na(d)))
-```
 
-```{r}
 # original:integer, need to be factor for classification
 d$click_bool <- factor(d$click_bool)
 
@@ -121,21 +123,58 @@ d_test <- d[-train_ind, ]
 nrow(d_train)
 ```
 
+```{r}
+# use subset data, srch_id % 100 equal 8
+ori_num <- nrow(d_train)
+# d <- subset(d, as.numeric(d$srch_id)%%10==8)
+# balance data(undersampling)
+pos_num <- sum(d_train$click_bool=='X2')
+d_sub <- d_train[sample(nrow(d_train), size=round(pos_num*1.02,0), replace=FALSE),]
+d_train <- rbind(subset(d_train, d_train$click_bool=='X2'), d_sub)
+# sum(d_balance$click_bool=='1')
+print(paste(round(nrow(d_train)/ori_num*100,3), "% data left."))
+```
 
 
 ```{r}
-# calculate AUC and draw ROC of null model: all prediction = 0, AUC = 0.5
+# show numbers of clicking and unclicking
+# round(prop.table(table(d$click_bool)),4)
+table(d$click_bool)
+total_rows <- nrow(d)
+num_positive <- table(d$click_bool)[2]
+print(paste("Ratio of click of all search results:", round(num_positive/total_rows*100,2),"%"))
+
+# show relation between position and booking
+clickData<-d[which(d$click_bool=="X2"),]
+summary(d$position)
+table(d$click_bool,d$position)
+print(qplot(position, data=clickData, geom="histogram", binwidth=1, main = "# of clicking vs Position "))
+# note that at position 5, 11 ,..there are fewer data.
+```
+
+
+```{r}
+# calculate AUC and draw ROC of null model 1: all prediction = 0, AUC = 0.5
 pred.0 <- rep(0,nrow(d))
 getAUC(pred.0, d$click_bool)
 pred1 <- prediction(pred.0, d$click_bool)
 perf1 <- performance(pred1, "tpr", "fpr")
 plot(perf1)
+
+#null model 2: position and desicion tree
+# dt.model <- rpart("click_bool ~ position + price_usd ", data=d_train)
+set.seed(1234)
+train_contrl <- trainControl(method = "cv", number = 5, summaryFunction=twoClassSummary, classProbs=T)
+dt.model <- train(as.formula(paste("click_bool", "position", sep = " ~ ")), data=d_train, method="rpart", metric="ROC", trControl=train_contrl)
+predTest_plot(dt.model, "Decision tree")
 ```
 
 ```{r}
 # Features selection
 # varNames1 <- c("position", "prop_review_score")
 varNames1 <- varNames[!varNames %in% c("click_bool","date_time", "gross_bookings_usd", "booking_bool")]
+# do not use competitor information
+varNames1 <- varNames1[!grepl("comp",varNames1 )]
 varNames1 <- paste(varNames1, collapse = "+")
 feat.form <- as.formula(paste("click_bool", varNames1, sep = " ~ "))
 print(feat.form)
@@ -153,27 +192,74 @@ varImpPlot(rf.fit, sort = T)
 
 ```{r}
 # caret random forest model, and CV, AUC
+start.time <- Sys.time()
 train_contrl <- trainControl(method = "cv", number = 5, summaryFunction=twoClassSummary, classProbs=T)
 rf.model <- train(feat.form, data = d_train, method="rf", trControl=train_contrl, metric="ROC")
-print(rf.model)
-# Prediction
-result.predicted.prob <- predict(rf.model, d_test, type="prob") 
-round(getAUC(result.predicted.prob$X2, d_test$click_bool),3)
-
-# Draw ROC curve.
-result.roc <- roc(response = d_test$click_bool, predictor = result.predicted.prob$X2)
-result.roc$auc
-plot(result.roc, main="ROC plot")
-plot(result.roc, print.thres="best", print.thres.best.method="closest.topleft")
-# result.coords <- coords(result.roc, "best", best.method="closest.topleft", ret=c("threshold", "accuracy"))
-# print(result.coords)#to get threshold and accuracy
+end.time <- Sys.time()
+print(paste("Random Forest training time:", round(end.time - start.time,2), 
+            'seconds'))
+# Predict and calculate AUC and draw ROC curve.
+predTest_plot(rf.model, "Random Forest")
 ```
 
 ```{r}
 # Model: logistic regression
+start.time <- Sys.time()
+train_contrl <- trainControl(method = "cv", number = 5, summaryFunction=twoClassSummary, classProbs=T)
+lr.model <- train(feat.form, data = d_train, method="glm", trControl=train_contrl, metric="ROC")
+end.time <- Sys.time()
+print(paste("Logistic Regression training time:", round(end.time - start.time,2), 
+            'seconds'))
+# Predict and calculate AUC and draw ROC curve.
+predTest_plot(lr.model, "Logistic Regression")
+```
+
+```{r}
+# use SVM model
+set.seed(1492)
+start.time <- Sys.time()
+train_contrl <- trainControl(method = "cv", number = 5, summaryFunction=twoClassSummary, classProbs=T)
+svm.model <- train(feat.form, d_train, method = "svmRadial", tuneLength = 9,metric="ROC", trControl=train_contrl)
+end.time <- Sys.time()
+print(paste("SVM training time:", round(end.time - start.time,2), 
+            'seconds'))
+print(svm.model)
+plot(svm.model)
+result.predicted.prob <- predict(svm.model, d_test, type="prob") 
+result.roc <- roc(response = d_test$click_bool, predictor = result.predicted.prob$X2)
+print(paste("SVM with radial kernel AUC: ",round(result.roc$auc,3)))
+plot(result.roc, main="ROC plot")
 
 ```
 
+```{r}
+# Ada boost model:
+pkgTest("fastAdaboost")
+start.time <- Sys.time()
+train_contrl <- trainControl(method = "cv", number = 5, summaryFunction=twoClassSummary, classProbs=T)
+ada.model <- train(feat.form, d_train, method = "adaboost", metric="ROC", trControl=train_contrl)
+end.time <- Sys.time()
+print(paste("Ada boost training time:", round(end.time - start.time,2), 
+            'seconds'))
+print(ada.model)
+plot(ada.model)
+result.predicted.prob <- predict(ada.model, d_test, type="prob") 
+result.roc <- roc(response = d_test$click_bool, predictor = result.predicted.prob$X2)
+print(paste("Ada boost AUC: ",round(result.roc$auc,3)))
+plot(result.roc, main="ROC plot")
+```
+
+```{r}
+# use model xgb
+pkgTest("xgboost")
+start.time <- Sys.time()
+train_contrl <- trainControl(method = "cv", number = 5, summaryFunction=twoClassSummary, classProbs=T)
+xgb.model <- train(feat.form, d_train, method='xgbTree', metric="ROC", trControl=train_contrl, nthread =3)
+end.time <- Sys.time()
+print(paste("XGBtree training time:", round(end.time - start.time,2), 
+            'seconds'))
+predTest_plot(xgb.model, "XGB tree")
+```
 
 Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Cmd+Option+I*.
 
