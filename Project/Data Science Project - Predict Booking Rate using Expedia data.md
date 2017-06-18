@@ -66,9 +66,24 @@
 ### Data processing
 
 1. Missing value
+
    * hotel descriptions:***prop_review_score***, ***prop_location_score2***, ***srch_query_affinity_score***
      * use worse case
-2. Categorical value to numeric value
+   * Historical data:
+     * use mean value
+   * Competitor information:
+     * set as 0
+       * No significan difference
+
+2. Features normalization
+
+3. Down sampling negative instances
+
+   * Choose balanced positive and negative data
+
+4. Randomly sample 10% by srch_id
+
+   ​
 
 
 
@@ -97,6 +112,7 @@ REF:
 
 
 * use caret to do cv: http://machinelearningmastery.com/how-to-estimate-model-accuracy-in-r-using-the-caret-package/
+* http://amunategui.github.io/binary-outcome-modeling/
 
 PDFs
 

@@ -24,42 +24,30 @@ getAUC <- function(preds, obs)
 {
   return(attributes(performance(prediction(preds, obs), "auc"))$y.values[[1]])
 }
+pkgTest("caret")
+pkgTest("pROC")
 ```
 
 ```{r}
 # load data
 # d<-read.csv('./data/smaller_100.csv', header=T,sep=",")
 d<-read.csv('./data/s.csv', header=T,sep=",", na.strings = "NULL")
-summary(d)
+# summary(d)
 print(nrow(d))
 varNames <- names(d)
 # summary(d)
 # typeof(d)
 ```
 
-```{r}
-# split data into train and test
-smp_size <- floor(0.75 * nrow(d))
-set.seed(5566)
-train_ind <- sample(seq_len(nrow(d)), size = smp_size)
-
-d_train <- d[train_ind, ]
-d_test <- d[-train_ind, ]
-nrow(d_train)
-```
-
 
 ```{r}
 # show numbers of non-booking and booking
 # round(prop.table(table(d$click_bool)),4)
-table(d$booking_bool)
+table(d$click_bool)
 total_rows <- nrow(d)
 num_positive <- table(d$click_bool)[2]
 print(paste("Ratio of click of all search results:", round(num_positive/total_rows*100,2),"%"))
-```
 
-
-```{r}
 # show relation between position and booking
 clickData<-d[which(d$click_bool==1),]
 summary(d$position)
@@ -113,6 +101,29 @@ print(sum(is.na(d)))
 ```
 
 ```{r}
+# original:integer, need to be factor for classification
+d$click_bool <- factor(d$click_bool)
+
+# convert format for caret: X1, X2
+levels <- unique(c(d[["click_bool"]]))
+d[["click_bool"]] <- factor(d[["click_bool"]],
+              labels=make.names(levels))
+table(d$click_bool)
+```
+
+```{r}
+# split data into train and test
+smp_size <- floor(0.75 * nrow(d))
+set.seed(5566)
+train_ind <- sample(seq_len(nrow(d)), size = smp_size)
+d_train <- d[train_ind, ]
+d_test <- d[-train_ind, ]
+nrow(d_train)
+```
+
+
+
+```{r}
 # calculate AUC and draw ROC of null model: all prediction = 0, AUC = 0.5
 pred.0 <- rep(0,nrow(d))
 getAUC(pred.0, d$click_bool)
@@ -122,54 +133,44 @@ plot(perf1)
 ```
 
 ```{r}
+# Features selection
+# varNames1 <- c("position", "prop_review_score")
+varNames1 <- varNames[!varNames %in% c("click_bool","date_time", "gross_bookings_usd", "booking_bool")]
+varNames1 <- paste(varNames1, collapse = "+")
+feat.form <- as.formula(paste("click_bool", varNames1, sep = " ~ "))
+print(feat.form)
+```
+
+
+```{r}
 # apply random forest
 pkgTest("randomForest")
 set.seed(119)
-# original:integer, need to be factor for classification
-# d$booking_bool <- factor(d$booking_bool)
-d$click_bool <- factor(d$click_bool)
-
-# choose features, and make right format for randomForest function
-# varNames1 <- c("position", "prop_review_score")
-varNames1 <- varNames[!varNames %in% c("click_bool","date_time", "gross_bookings_usd", "booking_bool")]
-summary(varNames1)
-make_name <- c(varNames1, "click_bool")
-for (f in make_name) {
-  if (class(d[[f]])=="factor") {
-    levels <- unique(c(d[[f]]))
-    d[[f]] <- factor(d[[f]],
-                    labels=make.names(levels))
-  }
-}
-varNames1 <- paste(varNames1, collapse = "+")
-rf.form <- as.formula(paste("click_bool", varNames1, sep = " ~ "))
-print(rf.form)
-rf.fit <- randomForest(rf.form, d, importance=T, ntree=50, na.action = na.exclude)
+rf.fit <- randomForest(feat.form, d_train, importance=T, ntree=50, na.action = na.exclude)
 plot(rf.fit)
 varImpPlot(rf.fit, sort = T)
 ```
 
 ```{r}
-pkgTest("caret")
+# caret random forest model, and CV, AUC
 train_contrl <- trainControl(method = "cv", number = 5, summaryFunction=twoClassSummary, classProbs=T)
-model <- train(rf.form, data = d, method="rf", trControl=train_contrl, metric="ROC")
-print(model)
-
-```
-```{r}
+rf.model <- train(feat.form, data = d_train, method="rf", trControl=train_contrl, metric="ROC")
+print(rf.model)
 # Prediction
-result.predicted.prob <- predict(model, newdata = d_test, type="prob") 
-getAUC(result.predicted.prob$X2, d_test$click_bool)
+result.predicted.prob <- predict(rf.model, d_test, type="prob") 
+round(getAUC(result.predicted.prob$X2, d_test$click_bool),3)
 
 # Draw ROC curve.
-class(d_test$click_bool)
-class(result.predicted.prob)
-result.roc <- roc(d_test$click_bool, result.predicted.prob$X2)
-plot(result.roc)
-# plot(result.roc, print.thres="best", print.thres.best.method="closest.topleft")
-# 
+result.roc <- roc(response = d_test$click_bool, predictor = result.predicted.prob$X2)
+result.roc$auc
+plot(result.roc, main="ROC plot")
+plot(result.roc, print.thres="best", print.thres.best.method="closest.topleft")
 # result.coords <- coords(result.roc, "best", best.method="closest.topleft", ret=c("threshold", "accuracy"))
 # print(result.coords)#to get threshold and accuracy
+```
+
+```{r}
+# Model: logistic regression
 
 ```
 
