@@ -48,8 +48,9 @@ predTest_plot <- function(trained_model, model_name)
 
 ```{r}
 # load data
-# d<-read.csv('./data/smaller_100.csv', header=T,sep=",", na.strings = "NULL")
-d<-read.csv('./data/s.csv', header=T, sep=",", na.strings = "NULL")
+d<-read.csv('./data/smaller_100.csv', header=T,sep=",", na.strings = "NULL")
+# d<-read.csv('./data/s.csv', header=T, sep=",", na.strings = "NULL")
+# d<-read.csv('./data/train.csv', header=T, sep=",", na.strings = "NULL")
 # summary(d)
 print(nrow(d))
 varNames <- names(d)
@@ -95,10 +96,10 @@ avg_dis <- mean(d$orig_destination_distance, na.rm=T)
 d$orig_destination_distance[is.na(d$orig_destination_distance)] <- avg_dis
 
 # log price
-ggplot(d, aes(x=d$price_usd)) + geom_histogram(col = 'white') + theme_light()
+# ggplot(d, aes(x=d$price_usd)) + geom_histogram(col = 'white') + theme_light()
 d$price_usd <- log(d$price_usd)
 d$visitor_hist_adr_usd <- log(d$visitor_hist_adr_usd)
-ggplot(d, aes(x=log(d$price_usd+1))) + geom_histogram(col = 'white') + theme_light()
+# ggplot(d, aes(x=log(d$price_usd+1))) + geom_histogram(col = 'white') + theme_light()
 
 # check any NA left or not: should be 0.
 print(sum(is.na(d)))
@@ -126,11 +127,11 @@ nrow(d_train)
 ```{r}
 # use subset data, srch_id % 100 equal 8
 ori_num <- nrow(d_train)
-# d <- subset(d, as.numeric(d$srch_id)%%10==8)
+d_train <- subset(d_train, as.numeric(d_train$srch_id)%%10==8)
 # balance data(undersampling)
-pos_num <- sum(d_train$click_bool=='X2')
-d_sub <- d_train[sample(nrow(d_train), size=round(pos_num*1.02,0), replace=FALSE),]
-d_train <- rbind(subset(d_train, d_train$click_bool=='X2'), d_sub)
+# pos_num <- sum(d_train$click_bool=='X2')
+# d_sub <- d_train[sample(nrow(d_train), size=round(pos_num*5,0), replace=FALSE),]
+# d_train <- rbind(subset(d_train, d_train$click_bool=='X2'), d_sub)
 # sum(d_balance$click_bool=='1')
 print(paste(round(nrow(d_train)/ori_num*100,3), "% data left."))
 ```
@@ -172,9 +173,13 @@ predTest_plot(dt.model, "Decision tree")
 ```{r}
 # Features selection
 # varNames1 <- c("position", "prop_review_score")
-varNames1 <- varNames[!varNames %in% c("click_bool","date_time", "gross_bookings_usd", "booking_bool")]
+# varNames1 <- varNames[!varNames %in% c("click_bool","date_time", "gross_bookings_usd", "booking_bool", "srch_id")]
 # do not use competitor information
-varNames1 <- varNames1[!grepl("comp",varNames1 )]
+# varNames1 <- varNames1[!grepl("comp",varNames1 )]
+
+# use few features
+varNames1 <- c("position", "price_usd", "prop_location_score1",
+               "prop_location_score2", "promotion_flag", "prop_review_score" )
 varNames1 <- paste(varNames1, collapse = "+")
 feat.form <- as.formula(paste("click_bool", varNames1, sep = " ~ "))
 print(feat.form)
@@ -223,12 +228,7 @@ svm.model <- train(feat.form, d_train, method = "svmRadial", tuneLength = 9,metr
 end.time <- Sys.time()
 print(paste("SVM training time:", round(end.time - start.time,2), 
             'seconds'))
-print(svm.model)
-plot(svm.model)
-result.predicted.prob <- predict(svm.model, d_test, type="prob") 
-result.roc <- roc(response = d_test$click_bool, predictor = result.predicted.prob$X2)
-print(paste("SVM with radial kernel AUC: ",round(result.roc$auc,3)))
-plot(result.roc, main="ROC plot")
+predTest_plot(svm.model, "SVM with radial kernel")
 
 ```
 
@@ -236,17 +236,12 @@ plot(result.roc, main="ROC plot")
 # Ada boost model:
 pkgTest("fastAdaboost")
 start.time <- Sys.time()
-train_contrl <- trainControl(method = "cv", number = 5, summaryFunction=twoClassSummary, classProbs=T)
+train_contrl <- trainControl(method = "cv", number = 2, summaryFunction=twoClassSummary, classProbs=T)
 ada.model <- train(feat.form, d_train, method = "adaboost", metric="ROC", trControl=train_contrl)
 end.time <- Sys.time()
 print(paste("Ada boost training time:", round(end.time - start.time,2), 
             'seconds'))
-print(ada.model)
-plot(ada.model)
-result.predicted.prob <- predict(ada.model, d_test, type="prob") 
-result.roc <- roc(response = d_test$click_bool, predictor = result.predicted.prob$X2)
-print(paste("Ada boost AUC: ",round(result.roc$auc,3)))
-plot(result.roc, main="ROC plot")
+predTest_plot(ada.model, "Ada boost")
 ```
 
 ```{r}
